@@ -35,6 +35,85 @@
     .badge-wishlist { background: #f5e0c3; color: #7a4f1e; }
     .badge-reading { background: #c5d9e8; color: #1e4a6b; }
     .empty-state { opacity: 0.7; }
+
+    /* Bookshelf styles */
+    .bookshelf {
+      background: linear-gradient(to bottom, #d4c4a8 0%, #c4b498 100%);
+      border-radius: 4px;
+      padding: 16px 12px 20px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+      position: relative;
+    }
+    .bookshelf::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 12px;
+      background: linear-gradient(to bottom, #a89070, #8b7355);
+      border-radius: 0 0 4px 4px;
+    }
+    .shelf-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 8px;
+      justify-content: flex-start;
+      align-items: flex-end;
+      min-height: 160px;
+      padding-bottom: 8px;
+    }
+    .book-spine {
+      width: 90px;
+      height: 140px;
+      border-radius: 2px 4px 4px 2px;
+      box-shadow: 2px 3px 8px rgba(0,0,0,0.25);
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: #5c4033;
+    }
+    .book-spine:hover {
+      transform: translateY(-8px) scale(1.03);
+      box-shadow: 4px 8px 16px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+    .book-spine img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .book-spine .no-cover {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px;
+      text-align: center;
+      color: #f5e6d3;
+      font-size: 10px;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #6b4c35, #4a3423);
+    }
+    .book-spine .no-cover .spine-title {
+      font-family: Georgia, serif;
+      font-weight: 600;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      max-height: 110px;
+      overflow: hidden;
+    }
+    .search-result-card {
+      transition: background 0.15s ease;
+    }
+    .search-result-card:hover {
+      background: #f5efe6;
+    }
   </style>
 </head>
 <body class="font-sans text-ink antialiased">
@@ -75,7 +154,7 @@
       </div>
     </div>
 
-    <!-- Tabs + Search + Add -->
+    <!-- Tabs + Search + Find Book -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
       <div class="flex gap-1 border-b border-soft">
         <button data-tab="owned" class="tab-btn tab-active px-4 py-2 text-sm transition" onclick="switchTab('owned')">Owned</button>
@@ -86,9 +165,9 @@
         <input id="search" type="search" placeholder="Search title, author, notes…" 
                class="flex-1 rounded-lg border border-soft bg-white/80 px-3 py-2 text-sm"
                oninput="render()" />
-        <button onclick="openModal()" 
+        <button onclick="openFindModal()" 
                 class="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent/90 transition whitespace-nowrap">
-          + Add book
+          Find a Book
         </button>
       </div>
     </div>
@@ -114,74 +193,135 @@
       </select>
     </div>
 
-    <!-- Book list -->
-    <div id="book-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+    <!-- Book list / Bookshelf -->
+    <div id="book-list"></div>
     <div id="empty" class="hidden empty-state text-center py-16 text-ink/50">
       <div class="text-5xl mb-3">📚</div>
       <p class="font-serif text-lg">No books yet</p>
-      <p class="text-sm mt-1">Add the first one with the button above</p>
+      <p class="text-sm mt-1">Find or add the first one with the button above</p>
     </div>
 
   </div>
 
-  <!-- Modal -->
-  <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
-    <div class="bg-cream rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-soft">
-      <div class="p-5 border-b border-soft flex justify-between items-center sticky top-0 bg-cream z-10">
-        <h2 id="modal-title" class="font-serif text-xl">Add book</h2>
-        <button onclick="closeModal()" class="text-ink/40 hover:text-ink text-2xl leading-none">&times;</button>
+  <!-- ========== FIND A BOOK MODAL ========== -->
+  <div id="find-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+    <div class="bg-cream rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden border border-soft flex flex-col">
+      <div class="p-5 border-b border-soft flex justify-between items-center bg-cream sticky top-0 z-10">
+        <h2 class="font-serif text-xl">Find a Book</h2>
+        <button onclick="closeFindModal()" class="text-ink/40 hover:text-ink text-2xl leading-none">&times;</button>
       </div>
-      <form id="book-form" class="p-5 space-y-4" onsubmit="saveBook(event)">
-        <input type="hidden" id="book-id" />
-        <div>
-          <label class="block text-xs font-medium text-ink/60 mb-1">Title *</label>
-          <input id="title" required class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="The Name of the Rose" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-ink/60 mb-1">Author</label>
-          <input id="author" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Umberto Eco" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-ink/60 mb-1">Status *</label>
-            <select id="status" required class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm">
-              <option value="owned">Owned</option>
-              <option value="wishlist">Wishlist</option>
-              <option value="reading">Currently reading</option>
-              <option value="read">Finished</option>
-            </select>
+
+      <!-- Mode tabs -->
+      <div class="flex border-b border-soft">
+        <button id="mode-search-btn" onclick="setFindMode('search')" class="flex-1 py-3 text-sm font-medium text-accent border-b-2 border-accent">
+          Search Open Library
+        </button>
+        <button id="mode-manual-btn" onclick="setFindMode('manual')" class="flex-1 py-3 text-sm font-medium text-ink/50 border-b-2 border-transparent">
+          Add Manually
+        </button>
+      </div>
+
+      <div class="overflow-y-auto flex-1">
+        <!-- SEARCH MODE -->
+        <div id="search-mode" class="p-5">
+          <div class="flex gap-2 mb-4">
+            <input id="ol-query" type="search" placeholder="Title, author or ISBN…" 
+                   class="flex-1 rounded-lg border border-soft bg-white px-3 py-2 text-sm"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();doOpenLibrarySearch();}" />
+            <button onclick="doOpenLibrarySearch()" class="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent/90">
+              Search
+            </button>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-ink/60 mb-1">Genre</label>
-            <input id="genre" list="genre-list" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Fiction" />
-            <datalist id="genre-list"></datalist>
-          </div>
+          <div id="ol-status" class="text-sm text-ink/50 mb-3 hidden"></div>
+          <div id="ol-results" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
         </div>
-        <div id="priority-wrap" class="hidden">
-          <label class="block text-xs font-medium text-ink/60 mb-1">Wishlist priority</label>
-          <select id="priority" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm">
-            <option value="3">High</option>
-            <option value="2" selected>Medium</option>
-            <option value="1">Low</option>
-          </select>
+
+        <!-- MANUAL MODE -->
+        <div id="manual-mode" class="p-5 hidden">
+          <form id="book-form" class="space-y-4" onsubmit="saveBook(event)">
+            <input type="hidden" id="book-id" />
+            <input type="hidden" id="cover-id" />
+            <div>
+              <label class="block text-xs font-medium text-ink/60 mb-1">Title *</label>
+              <input id="title" required class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="The Name of the Rose" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ink/60 mb-1">Author</label>
+              <input id="author" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Umberto Eco" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-ink/60 mb-1">Status *</label>
+                <select id="status" required class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm">
+                  <option value="owned">Owned</option>
+                  <option value="wishlist">Wishlist</option>
+                  <option value="reading">Currently reading</option>
+                  <option value="read">Finished</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-ink/60 mb-1">Genre</label>
+                <input id="genre" list="genre-list" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Fiction" />
+                <datalist id="genre-list"></datalist>
+              </div>
+            </div>
+            <div id="priority-wrap" class="hidden">
+              <label class="block text-xs font-medium text-ink/60 mb-1">Wishlist priority</label>
+              <select id="priority" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm">
+                <option value="3">High</option>
+                <option value="2" selected>Medium</option>
+                <option value="1">Low</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ink/60 mb-1">Notes / why she wants it</label>
+              <textarea id="notes" rows="2" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Recommended by…"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ink/60 mb-1">Link (optional)</label>
+              <input id="link" type="url" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="https://…" />
+            </div>
+            <div class="flex gap-2 pt-2">
+              <button type="submit" class="flex-1 bg-accent text-white py-2.5 rounded-lg text-sm font-medium hover:bg-accent/90 transition">
+                Save
+              </button>
+              <button type="button" onclick="closeFindModal()" class="px-4 py-2.5 rounded-lg border border-soft text-sm text-ink/70 hover:bg-white/50 transition">
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-ink/60 mb-1">Notes / why she wants it</label>
-          <textarea id="notes" rows="2" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="Recommended by…"></textarea>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-ink/60 mb-1">Link (optional)</label>
-          <input id="link" type="url" class="w-full rounded-lg border border-soft bg-white px-3 py-2 text-sm" placeholder="https://…" />
-        </div>
-        <div class="flex gap-2 pt-2">
-          <button type="submit" class="flex-1 bg-accent text-white py-2.5 rounded-lg text-sm font-medium hover:bg-accent/90 transition">
-            Save
-          </button>
-          <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-lg border border-soft text-sm text-ink/70 hover:bg-white/50 transition">
-            Cancel
-          </button>
-        </div>
-      </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SELECT STATUS AFTER SEARCH ========== -->
+  <div id="status-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop">
+    <div class="bg-cream rounded-2xl shadow-xl w-full max-w-sm border border-soft p-5">
+      <h3 class="font-serif text-lg mb-1" id="status-modal-title">Add to library</h3>
+      <p class="text-sm text-ink/60 mb-4" id="status-modal-author"></p>
+      <div class="space-y-2 mb-4">
+        <label class="flex items-center gap-3 p-3 rounded-lg border border-soft bg-white cursor-pointer hover:bg-soft/30">
+          <input type="radio" name="quick-status" value="owned" checked class="accent-accent" />
+          <span>Owned</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-lg border border-soft bg-white cursor-pointer hover:bg-soft/30">
+          <input type="radio" name="quick-status" value="wishlist" class="accent-accent" />
+          <span>Wishlist</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-lg border border-soft bg-white cursor-pointer hover:bg-soft/30">
+          <input type="radio" name="quick-status" value="reading" class="accent-accent" />
+          <span>Currently reading</span>
+        </label>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="confirmSearchAdd()" class="flex-1 bg-accent text-white py-2.5 rounded-lg text-sm font-medium hover:bg-accent/90">
+          Add Book
+        </button>
+        <button onclick="closeStatusModal()" class="px-4 py-2.5 rounded-lg border border-soft text-sm text-ink/70">
+          Cancel
+        </button>
+      </div>
     </div>
   </div>
 
@@ -193,6 +333,7 @@
     let books = [];
     let currentTab = 'owned';
     let editingId = null;
+    let pendingSearchBook = null; // holds OL result waiting for status choice
 
     // ——— Persistence ———
     function load() {
@@ -233,6 +374,11 @@
       return { 3: 'High', 2: 'Medium', 1: 'Low' }[p] || '';
     }
 
+    function coverUrl(coverId, size = 'M') {
+      if (!coverId) return null;
+      return `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`;
+    }
+
     // ——— Tabs ———
     function switchTab(tab) {
       currentTab = tab;
@@ -241,7 +387,6 @@
         btn.classList.toggle('tab-active', active);
         btn.classList.toggle('text-ink/50', !active);
       });
-      // Sync status filter when switching main tabs
       const statusSel = document.getElementById('filter-status');
       if (tab === 'owned') statusSel.value = 'owned';
       else if (tab === 'wishlist') statusSel.value = 'wishlist';
@@ -249,45 +394,154 @@
       render();
     }
 
-    // ——— Modal ———
-    function openModal(id = null) {
-      editingId = id;
-      const form = document.getElementById('book-form');
-      form.reset();
+    // ——— Find Modal ———
+    function openFindModal() {
+      setFindMode('search');
+      document.getElementById('ol-query').value = '';
+      document.getElementById('ol-results').innerHTML = '';
+      document.getElementById('ol-status').classList.add('hidden');
+      // reset manual form
+      document.getElementById('book-form').reset();
       document.getElementById('book-id').value = '';
-      document.getElementById('modal-title').textContent = id ? 'Edit book' : 'Add book';
+      document.getElementById('cover-id').value = '';
       document.getElementById('priority-wrap').classList.add('hidden');
-
-      if (id) {
-        const b = books.find(x => x.id === id);
-        if (b) {
-          document.getElementById('book-id').value = b.id;
-          document.getElementById('title').value = b.title || '';
-          document.getElementById('author').value = b.author || '';
-          document.getElementById('status').value = b.status || 'owned';
-          document.getElementById('genre').value = b.genre || '';
-          document.getElementById('priority').value = b.priority || 2;
-          document.getElementById('notes').value = b.notes || '';
-          document.getElementById('link').value = b.link || '';
-          togglePriority();
-        }
-      }
-      document.getElementById('modal').classList.remove('hidden');
-      document.getElementById('title').focus();
-    }
-
-    function closeModal() {
-      document.getElementById('modal').classList.add('hidden');
       editingId = null;
+      document.getElementById('find-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('ol-query').focus(), 50);
     }
 
+    function closeFindModal() {
+      document.getElementById('find-modal').classList.add('hidden');
+      editingId = null;
+      pendingSearchBook = null;
+    }
+
+    function setFindMode(mode) {
+      const isSearch = mode === 'search';
+      document.getElementById('search-mode').classList.toggle('hidden', !isSearch);
+      document.getElementById('manual-mode').classList.toggle('hidden', isSearch);
+      document.getElementById('mode-search-btn').classList.toggle('text-accent', isSearch);
+      document.getElementById('mode-search-btn').classList.toggle('border-accent', isSearch);
+      document.getElementById('mode-search-btn').classList.toggle('text-ink/50', !isSearch);
+      document.getElementById('mode-search-btn').classList.toggle('border-transparent', !isSearch);
+      document.getElementById('mode-manual-btn').classList.toggle('text-accent', !isSearch);
+      document.getElementById('mode-manual-btn').classList.toggle('border-accent', !isSearch);
+      document.getElementById('mode-manual-btn').classList.toggle('text-ink/50', isSearch);
+      document.getElementById('mode-manual-btn').classList.toggle('border-transparent', isSearch);
+    }
+
+    // ——— Open Library Search ———
+    async function doOpenLibrarySearch() {
+      const q = document.getElementById('ol-query').value.trim();
+      if (!q) return;
+
+      const statusEl = document.getElementById('ol-status');
+      const resultsEl = document.getElementById('ol-results');
+      statusEl.textContent = 'Searching…';
+      statusEl.classList.remove('hidden');
+      resultsEl.innerHTML = '';
+
+      try {
+        const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=15`);
+        const data = await res.json();
+        const docs = data.docs || [];
+
+        if (docs.length === 0) {
+          statusEl.textContent = 'No results found. Try a different query or switch to Add Manually.';
+          return;
+        }
+
+        statusEl.textContent = `${docs.length} result${docs.length === 1 ? '' : 's'}`;
+        resultsEl.innerHTML = docs.map((doc, i) => {
+          const title = doc.title || 'Unknown title';
+          const author = (doc.author_name && doc.author_name.join(', ')) || '';
+          const coverId = doc.cover_i || null;
+          const year = doc.first_publish_year || '';
+          const img = coverId
+            ? `<img src="${coverUrl(coverId, 'S')}" alt="" class="w-10 h-14 object-cover rounded shadow-sm flex-shrink-0" onerror="this.style.display='none'" />`
+            : `<div class="w-10 h-14 bg-soft rounded flex items-center justify-center text-ink/30 text-xs flex-shrink-0">?</div>`;
+
+          return `
+            <button type="button" onclick='selectSearchResult(${JSON.stringify({ title, author, coverId }).replace(/'/g, "&#39;")})'
+                    class="search-result-card w-full flex items-center gap-3 p-2 rounded-lg border border-soft/80 text-left">
+              ${img}
+              <div class="min-w-0 flex-1">
+                <div class="font-medium text-sm truncate">${escapeHtml(title)}</div>
+                <div class="text-xs text-ink/55 truncate">${escapeHtml(author)}${year ? ' · ' + year : ''}</div>
+              </div>
+            </button>
+          `;
+        }).join('');
+      } catch (err) {
+        statusEl.textContent = 'Search failed. Check your connection or try again.';
+        console.error(err);
+      }
+    }
+
+    function selectSearchResult(book) {
+      pendingSearchBook = book;
+      document.getElementById('status-modal-title').textContent = book.title;
+      document.getElementById('status-modal-author').textContent = book.author || 'Unknown author';
+      document.getElementById('status-modal').classList.remove('hidden');
+    }
+
+    function closeStatusModal() {
+      document.getElementById('status-modal').classList.add('hidden');
+      pendingSearchBook = null;
+    }
+
+    function confirmSearchAdd() {
+      if (!pendingSearchBook) return;
+      const status = document.querySelector('input[name="quick-status"]:checked').value;
+      const book = {
+        id: uid(),
+        title: pendingSearchBook.title,
+        author: pendingSearchBook.author || '',
+        status,
+        genre: '',
+        priority: 2,
+        notes: '',
+        link: '',
+        coverId: pendingSearchBook.coverId || null,
+        added: Date.now(),
+        updated: Date.now(),
+      };
+      books.unshift(book);
+      save();
+      closeStatusModal();
+      closeFindModal();
+      toast('Added from Open Library');
+      // Switch to the relevant tab
+      if (status === 'wishlist') switchTab('wishlist');
+      else switchTab('owned');
+      render();
+    }
+
+    // ——— Manual form helpers ———
     document.getElementById('status').addEventListener('change', togglePriority);
     function togglePriority() {
       const show = document.getElementById('status').value === 'wishlist';
       document.getElementById('priority-wrap').classList.toggle('hidden', !show);
     }
 
-    // ——— CRUD ———
+    function openEditModal(id) {
+      editingId = id;
+      setFindMode('manual');
+      const b = books.find(x => x.id === id);
+      if (!b) return;
+      document.getElementById('book-id').value = b.id;
+      document.getElementById('cover-id').value = b.coverId || '';
+      document.getElementById('title').value = b.title || '';
+      document.getElementById('author').value = b.author || '';
+      document.getElementById('status').value = b.status || 'owned';
+      document.getElementById('genre').value = b.genre || '';
+      document.getElementById('priority').value = b.priority || 2;
+      document.getElementById('notes').value = b.notes || '';
+      document.getElementById('link').value = b.link || '';
+      togglePriority();
+      document.getElementById('find-modal').classList.remove('hidden');
+    }
+
     function saveBook(e) {
       e.preventDefault();
       const id = document.getElementById('book-id').value || uid();
@@ -301,6 +555,7 @@
         priority: Number(document.getElementById('priority').value) || 2,
         notes: document.getElementById('notes').value.trim(),
         link: document.getElementById('link').value.trim(),
+        coverId: document.getElementById('cover-id').value || (existing && existing.coverId) || null,
         added: existing ? existing.added : Date.now(),
         updated: Date.now(),
       };
@@ -312,7 +567,7 @@
         toast('Added');
       }
       save();
-      closeModal();
+      closeFindModal();
       render();
     }
 
@@ -359,7 +614,6 @@
       const current = sel.value;
       sel.innerHTML = '<option value="">All genres</option>' + genres.map(g => `<option value="${g}">${g}</option>`).join('');
       sel.value = current;
-      // Also refresh datalist
       document.getElementById('genre-list').innerHTML = genres.map(g => `<option value="${g}">`).join('');
     }
 
@@ -382,13 +636,12 @@
         return true;
       });
 
-      // Sort
       list.sort((a, b) => {
         if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
         if (sort === 'author') return (a.author || '').localeCompare(b.author || '');
         if (sort === 'priority') return (b.priority || 0) - (a.priority || 0);
         if (sort === 'added-asc') return (a.added || 0) - (b.added || 0);
-        return (b.added || 0) - (a.added || 0); // newest first
+        return (b.added || 0) - (a.added || 0);
       });
 
       const container = document.getElementById('book-list');
@@ -401,25 +654,65 @@
       }
       empty.classList.add('hidden');
 
-      container.innerHTML = list.map(b => `
-        <article class="book-card bg-white/80 rounded-xl border border-soft/80 p-4 flex flex-col">
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <span class="text-xs px-2 py-0.5 rounded-full ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
-            ${b.status === 'wishlist' && b.priority ? `<span class="text-xs text-ink/40">${priorityLabel(b.priority)} priority</span>` : ''}
+      // Bookshelf view for Owned tab (when showing owned/reading/read)
+      const useBookshelf = currentTab === 'owned' && (!statusF || statusF === 'owned' || statusF === 'reading' || statusF === 'read');
+
+      if (useBookshelf) {
+        container.innerHTML = `
+          <div class="bookshelf mb-6">
+            <div class="shelf-row">
+              ${list.map(b => {
+                const imgSrc = coverUrl(b.coverId, 'M');
+                if (imgSrc) {
+                  return `
+                    <div class="book-spine" onclick="openEditModal('${b.id}')" title="${escapeAttr(b.title)} — ${escapeAttr(b.author || '')}">
+                      <img src="${imgSrc}" alt="${escapeAttr(b.title)}" loading="lazy"
+                           onerror="this.parentElement.innerHTML='<div class=\\'no-cover\\'><div class=\\'spine-title\\'>${escapeHtml(b.title)}</div></div>'" />
+                    </div>
+                  `;
+                }
+                return `
+                  <div class="book-spine" onclick="openEditModal('${b.id}')" title="${escapeAttr(b.title)}">
+                    <div class="no-cover">
+                      <div class="spine-title">${escapeHtml(b.title)}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </div>
-          <h3 class="font-serif text-lg leading-snug text-ink">${escapeHtml(b.title)}</h3>
-          ${b.author ? `<p class="text-sm text-ink/60 mt-0.5">${escapeHtml(b.author)}</p>` : ''}
-          ${b.genre ? `<p class="text-xs text-ink/40 mt-1">${escapeHtml(b.genre)}</p>` : ''}
-          ${b.notes ? `<p class="text-sm text-ink/55 mt-2 line-clamp-2">${escapeHtml(b.notes)}</p>` : ''}
-          <div class="mt-auto pt-3 flex flex-wrap gap-1.5">
-            ${b.link ? `<a href="${escapeAttr(b.link)}" target="_blank" rel="noopener" class="text-xs px-2 py-1 rounded bg-soft/60 hover:bg-soft text-ink/70">Link</a>` : ''}
-            <button onclick="openModal('${b.id}')" class="text-xs px-2 py-1 rounded bg-soft/60 hover:bg-soft text-ink/70">Edit</button>
-            ${b.status === 'wishlist' ? `<button onclick="moveToOwned('${b.id}')" class="text-xs px-2 py-1 rounded bg-sage/20 hover:bg-sage/30 text-sage">Got it!</button>` : ''}
-            ${b.status === 'owned' ? `<button onclick="setReading('${b.id}')" class="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-800">Reading</button>` : ''}
-            <button onclick="deleteBook('${b.id}')" class="text-xs px-2 py-1 rounded text-red-600/70 hover:bg-red-50 ml-auto">Delete</button>
-          </div>
-        </article>
-      `).join('');
+          <p class="text-xs text-ink/40 text-center mb-4">Click a book to edit · Covers from Open Library</p>
+        `;
+      } else {
+        // Card view for Wishlist / All / filtered views
+        container.innerHTML = `<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">` + list.map(b => {
+          const imgSrc = coverUrl(b.coverId, 'S');
+          const coverHtml = imgSrc
+            ? `<img src="${imgSrc}" alt="" class="w-12 h-16 object-cover rounded shadow-sm flex-shrink-0" onerror="this.style.display='none'" />`
+            : '';
+          return `
+            <article class="book-card bg-white/80 rounded-xl border border-soft/80 p-4 flex gap-3">
+              ${coverHtml}
+              <div class="flex-1 min-w-0 flex flex-col">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <span class="text-xs px-2 py-0.5 rounded-full ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
+                  ${b.status === 'wishlist' && b.priority ? `<span class="text-xs text-ink/40">${priorityLabel(b.priority)}</span>` : ''}
+                </div>
+                <h3 class="font-serif text-base leading-snug text-ink truncate">${escapeHtml(b.title)}</h3>
+                ${b.author ? `<p class="text-sm text-ink/60 truncate">${escapeHtml(b.author)}</p>` : ''}
+                ${b.notes ? `<p class="text-sm text-ink/55 mt-1 line-clamp-2">${escapeHtml(b.notes)}</p>` : ''}
+                <div class="mt-auto pt-2 flex flex-wrap gap-1.5">
+                  ${b.link ? `<a href="${escapeAttr(b.link)}" target="_blank" rel="noopener" class="text-xs px-2 py-1 rounded bg-soft/60 hover:bg-soft text-ink/70">Link</a>` : ''}
+                  <button onclick="openEditModal('${b.id}')" class="text-xs px-2 py-1 rounded bg-soft/60 hover:bg-soft text-ink/70">Edit</button>
+                  ${b.status === 'wishlist' ? `<button onclick="moveToOwned('${b.id}')" class="text-xs px-2 py-1 rounded bg-sage/20 hover:bg-sage/30 text-sage">Got it!</button>` : ''}
+                  ${b.status === 'owned' ? `<button onclick="setReading('${b.id}')" class="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-800">Reading</button>` : ''}
+                  <button onclick="deleteBook('${b.id}')" class="text-xs px-2 py-1 rounded text-red-600/70 hover:bg-red-50 ml-auto">Delete</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('') + `</div>`;
+      }
     }
 
     function escapeHtml(str) {
@@ -467,17 +760,21 @@
 
     // ——— Init ———
     load();
-    // Default tab filter
     document.getElementById('filter-status').value = 'owned';
     render();
 
-    // Close modal on backdrop click
-    document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') closeModal();
+    // Close modals on backdrop / Escape
+    document.getElementById('find-modal').addEventListener('click', e => {
+      if (e.target.id === 'find-modal') closeFindModal();
     });
-    // Escape key
+    document.getElementById('status-modal').addEventListener('click', e => {
+      if (e.target.id === 'status-modal') closeStatusModal();
+    });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape') {
+        closeFindModal();
+        closeStatusModal();
+      }
     });
   </script>
 </body>
